@@ -35,8 +35,8 @@ public class App {
                         //OnError
         
         
-                //then...
-                String lastEventId = connection.close();
+        //then...
+        String lastEventId = connection.close();
         
     }
 }
