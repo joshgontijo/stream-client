@@ -12,7 +12,7 @@ public class SseConfiguration {
     private final XnioWorker worker;
     private String lastEventId;
 
-    private int reconnectInterval = 2000;
+    private int retryInterval = 2000;
     private int maxRetries = -1;
 
     private Runnable onOpen = () -> {};
@@ -57,8 +57,8 @@ public class SseConfiguration {
         return this;
     }
 
-    public SseConfiguration reconnectInterval(int reconnectInterval) {
-        this.reconnectInterval = reconnectInterval;
+    public SseConfiguration retryInterval(int retryInterval) {
+        this.retryInterval = retryInterval;
         return this;
     }
 
@@ -91,7 +91,7 @@ public class SseConfiguration {
             }
         };
 
-        SSEConnection connection = new SSEConnection(url, callback, worker, reconnectInterval, maxRetries);
+        SSEConnection connection = new SSEConnection(url, callback, worker, retryInterval, maxRetries);
         connection.connect(lastEventId);
         return connection;
     }

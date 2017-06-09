@@ -17,7 +17,7 @@ public class WsConfiguration {
     final String url;
     final XnioWorker worker;
 
-    int reconnectInterval = 2000;
+    int retryInterval = 2000;
     int maxRetries = -1;
 
     BiConsumer<WebSocketChannel, WebSocketHttpExchange> onConnect = (exchange, channel) -> {};
@@ -79,8 +79,8 @@ public class WsConfiguration {
         return this;
     }
 
-    public WsConfiguration reconnectInterval(int reconnectInterval) {
-        this.reconnectInterval = reconnectInterval;
+    public WsConfiguration retryInterval(int retryInterval) {
+        this.retryInterval = retryInterval;
         return this;
     }
 

@@ -22,7 +22,7 @@ import io.joshworks.stream.client.sse.SseClientCallback;
 import io.joshworks.stream.client.sse.SseConfiguration;
 import io.joshworks.stream.client.ws.WebSocketClientEndpoint;
 import io.joshworks.stream.client.ws.WsConfiguration;
-import io.undertow.websockets.core.WebSocketChannel;
+import io.joshworks.stream.client.ws.WsConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xnio.OptionMap;
@@ -100,7 +100,7 @@ public final class StreamClient {
         return new WsConfiguration(url, getWorker());
     }
 
-    public static WebSocketChannel connect(String url, WebSocketClientEndpoint endpoint) {
+    public static WsConnection connect(String url, WebSocketClientEndpoint endpoint) {
         return new WsConfiguration(url, getWorker(), endpoint).connect();
     }
 

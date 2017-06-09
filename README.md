@@ -1,12 +1,5 @@
 # Stream client
-Simple client for Server sent events (SSE) and Websockets
-
-## Features
-
-- Connection retry
-- Based on Undertow NIO
-- Simple interface
-
+Simple client for Server sent events (SSE) and WebSockets with connection retry based on Undertow
 
 
 ### Maven
@@ -25,6 +18,7 @@ Simple client for Server sent events (SSE) and Websockets
 
 ```
 
+##Server sent events
 
 ### Using fluent interface to connect to a SSE endpoint
 ```java
@@ -94,20 +88,101 @@ public class App {
     public static void main(final String[] args) {
       
         SSEConnection connection = StreamClient.sse("http://my-service/sse")
-                              .reconnectInterval(5000)
+                              .retryInterval(5000)
                               .maxRetries(10)
                               .onEvent((data) -> System.out.println("New event: " + data))
                               .connect();
         
         
-                //then...
-                String lastEventId = connection.close();
+        //then...
+        String lastEventId = connection.close();
         
     }
 }
 ```
 
-### Configuring worker threads
+##Websockets
+
+### Using fluent interface to connect to a WebSocket endpoint
+```java
+public class App {
+
+    public static void main(final String[] args) {
+        
+     WsConnection ws = StreamClient.ws("http://my-service/ws")
+                    .onText((channel, message) -> System.out.println("Message received: " + message))
+                    .connect();
+    
+            //...
+            ws.close(new CloseMessage(CloseMessage.NORMAL_CLOSURE, "Bye"));
+    
+        }
+}
+```
+
+### Using dedicated handler to connect to a WebSocket endpoint
+```java
+
+public class MyEndpoint extends WebSocketClientEndpoint {
+
+    //..method signatures for brevity
+    protected void onConnect(WebSocketChannel channel, WebSocketHttpExchange exchange);
+    protected void onClose(WebSocketChannel channel, CloseMessage message) ;
+    protected void onPing(WebSocketChannel channel, BufferedBinaryMessage message);
+    protected void onPong(WebSocketChannel channel, BufferedBinaryMessage message);
+    protected void onText(WebSocketChannel channel, BufferedTextMessage message);
+    protected void onBinary(WebSocketChannel channel, BufferedBinaryMessage message);
+    protected void onError(WebSocketChannel channel, Exception error);
+
+}
+
+public class App {
+
+    public static void main(final String[] args) {
+    
+           StreamClient.connect("http://my-service/ws", new MyEndpoint());
+    
+    }
+}
+```
+
+### Sending message to a server
+```java
+
+public class App {
+
+    public static void main(final String[] args) {
+    
+           WsConnection ws = StreamClient.connect(...);
+           
+           //undertow API
+           WebSockets.sendText("Hello", ws.channel(), null);
+           WebSockets.sendBinary(new byte[]{1}, ws.channel(), null);
+           //...etc
+    
+    }
+}
+```
+
+### Reconnecting
+When a connection gets dropped with status codes 1001 or 1011 (as defined [Here](http://tools.ietf.org/html/rfc6455#section-7.4)) then the client will retry to reconnect.
+
+```java
+
+public class App {
+
+    public static void main(final String[] args) {
+    
+           StreamClient.ws("http://my-service/ws")
+                    .maxRetries(100)
+                    .retryInterval(5000)
+                    .connect();
+    
+    }
+}
+```
+
+##XnioWorker configuration
 The XnioWorker is shared across all clients (SSE and WS), in case of many connections, the thread pool can be tuned
 
 ```java
@@ -124,15 +199,10 @@ public class App {
         
         StreamClient.configure(options);
         
-        StreamClient.sse("http://my-service/sse")
-                              .onEvent((data) -> System.out.println("New event: " + data))
-                              .connect();
+        StreamClient.sse(...);
+        StreamClient.ws(...);
         
         //...
-        
     }
 }
 ```
-
-##Websockets
-

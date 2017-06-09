@@ -38,7 +38,7 @@ public class WsConnection {
             logger.warn("Max retries ({}) exceeded, not reconnecting");
             return;
         }
-        executor.schedule(this::connect, configuration.reconnectInterval, TimeUnit.MILLISECONDS);
+        executor.schedule(this::connect, configuration.retryInterval, TimeUnit.MILLISECONDS);
     }
 
     void connect() {
