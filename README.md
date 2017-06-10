@@ -206,3 +206,16 @@ public class App {
     }
 }
 ```
+
+### Closing all connections ###
+
+```java
+public class App {
+
+    public static void main(final String[] args) {
+     
+        //...
+        StreamClient.shutdown();
+    }
+}
+```
