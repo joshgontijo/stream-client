@@ -31,9 +31,10 @@ public class App {
                         .onEvent((data) -> System.out.println("New event: " + data))
                         .connect();
                         
-                        onServerCloserClose
+                        //onClose
                         //onOpen
                         //OnError
+                        
         
         
         //then...
