@@ -1,5 +1,5 @@
 # Stream client
-Simple client for Server sent events (SSE) and WebSockets with connection retry based on Undertow
+Resilient client for Server sent events (SSE) and WebSockets based on Undertow
 
 
 ### Maven
@@ -18,7 +18,8 @@ Simple client for Server sent events (SSE) and WebSockets with connection retry 
 
 ```
 
-##Server sent events
+
+## Server sent events ##
 
 ### Using fluent interface to connect to a SSE endpoint
 ```java
@@ -81,7 +82,7 @@ public class App {
 }
 ```
 
-##Websockets
+## Websockets ##
 
 ### Using fluent interface to connect to a WebSocket endpoint
 ```java
@@ -180,7 +181,7 @@ public class App {
 }
 ```
 
-##XnioWorker configuration
+## XnioWorker configuration ##
 The XnioWorker is shared across all clients (SSE and WS), in case of many connections, the thread pool can be tuned
 
 ```java
