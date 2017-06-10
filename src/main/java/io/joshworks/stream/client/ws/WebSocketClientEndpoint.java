@@ -17,7 +17,6 @@ public class WebSocketClientEndpoint {
      * Called when the server closes the connection
      * @param channel The client channel
      * @param message the close message sent by the server, may be null
-     * @return If a reconnection should be attempted, false by default
      */
     protected void onClose(WebSocketChannel channel, CloseMessage message) {
     }
