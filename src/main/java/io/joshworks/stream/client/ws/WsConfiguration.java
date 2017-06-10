@@ -1,50 +1,51 @@
 package io.joshworks.stream.client.ws;
 
+import io.joshworks.stream.client.ClientConfiguration;
+import io.joshworks.stream.client.ConnectionMonitor;
 import io.undertow.websockets.core.BufferedBinaryMessage;
 import io.undertow.websockets.core.BufferedTextMessage;
 import io.undertow.websockets.core.CloseMessage;
 import io.undertow.websockets.core.WebSocketChannel;
-import io.undertow.websockets.spi.WebSocketHttpExchange;
 import org.xnio.XnioWorker;
 
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  * Created by Josh Gontijo on 6/8/17.
  */
-public class WsConfiguration {
+public class WsConfiguration extends ClientConfiguration {
 
-    final String url;
-    final XnioWorker worker;
+    private Consumer<WebSocketChannel> onConnect = (channel) -> {
+    };
+    private BiConsumer<WebSocketChannel, BufferedBinaryMessage> onPing = (wsChannel, channel) -> {
+    };
+    private BiConsumer<WebSocketChannel, BufferedBinaryMessage> onPong = (wsChannel, channel) -> {
+    };
+    private BiConsumer<WebSocketChannel, BufferedTextMessage> onText = (wsChannel, channel) -> {
+    };
+    private BiConsumer<WebSocketChannel, BufferedBinaryMessage> onBinary = (wsChannel, channel) -> {
+    };
+    private BiConsumer<WebSocketChannel, Exception> onError = (wsChannel, error) -> {
+    };
+    private BiConsumer<WebSocketChannel, CloseMessage> onClose = (wsChannel, message) -> {
+    };
 
-    int retryInterval = 2000;
-    int maxRetries = -1;
+    private WebSocketClientEndpoint endpoint;
 
-    BiConsumer<WebSocketChannel, WebSocketHttpExchange> onConnect = (exchange, channel) -> {};
-    BiConsumer<WebSocketChannel, BufferedBinaryMessage> onPing = (wsChannel, channel) -> {};
-    BiConsumer<WebSocketChannel, BufferedBinaryMessage> onPong = (wsChannel, channel) -> {};
-    BiConsumer<WebSocketChannel, BufferedTextMessage> onText = (wsChannel, channel) -> {};
-    BiConsumer<WebSocketChannel, BufferedBinaryMessage> onBinary = (wsChannel, channel) -> {};
-    BiConsumer<WebSocketChannel, Exception> onError = (wsChannel, error) -> {};
-    BiConsumer<WebSocketChannel, CloseMessage> onClose = (wsChannel, message) -> {};
 
-    public WsConfiguration(String url, XnioWorker worker, WebSocketClientEndpoint endpoint) {
-        this(url, worker);
-        this.onConnect = endpoint::onConnect;
-        this.onPing = endpoint::onPing;
-        this.onPong = endpoint::onPong;
-        this.onText = endpoint::onText;
-        this.onBinary = endpoint::onBinary;
-        this.onError = endpoint::onError;
-        this.onClose = endpoint::onClose;
+    public WsConfiguration(String url, XnioWorker worker, ScheduledExecutorService scheduler, ConnectionMonitor monitor) {
+        super(url, worker, scheduler, monitor);
     }
 
-    public WsConfiguration(String url, XnioWorker worker) {
-        this.url = url;
-        this.worker = worker;
+    public WsConfiguration(String url, XnioWorker worker, ScheduledExecutorService scheduler,
+                           ConnectionMonitor monitor, WebSocketClientEndpoint endpoint) {
+        super(url, worker, scheduler, monitor);
+        this.endpoint = endpoint;
     }
 
-    public WsConfiguration onConnect(BiConsumer<WebSocketChannel, WebSocketHttpExchange> onConnect) {
+    public WsConfiguration onConnect(Consumer<WebSocketChannel> onConnect) {
         this.onConnect = onConnect;
         return this;
     }
@@ -89,10 +90,56 @@ public class WsConfiguration {
         return this;
     }
 
+    public WsConfiguration autoReconnect(boolean autoReconnect) {
+        this.autoReconnect = autoReconnect;
+        return this;
+    }
+
     public WsConnection connect() {
-        WsConnection wsConnection = new WsConnection(this);
+        endpoint = endpoint == null ? createEndpoint() : endpoint;
+        WsConnection wsConnection = new WsConnection(url, worker, maxRetries, retryInterval, autoReconnect, scheduler, monitor, endpoint);
         wsConnection.connect();
+
         return wsConnection;
+    }
+
+    private WebSocketClientEndpoint createEndpoint() {
+        return new WebSocketClientEndpoint() {
+            @Override
+            protected void onConnect(WebSocketChannel channel) {
+                onConnect.accept(channel);
+            }
+
+            @Override
+            protected void onClose(WebSocketChannel channel, CloseMessage message) {
+                onClose.accept(channel, message);
+            }
+
+            @Override
+            protected void onPing(WebSocketChannel channel, BufferedBinaryMessage message) {
+                onPing.accept(channel, message);
+            }
+
+            @Override
+            protected void onPong(WebSocketChannel channel, BufferedBinaryMessage message) {
+                onPong.accept(channel, message);
+            }
+
+            @Override
+            protected void onText(WebSocketChannel channel, BufferedTextMessage message) {
+                onText.accept(channel, message);
+            }
+
+            @Override
+            protected void onBinary(WebSocketChannel channel, BufferedBinaryMessage message) {
+                onBinary.accept(channel, message);
+            }
+
+            @Override
+            protected void onError(WebSocketChannel channel, Exception error) {
+                onError.accept(channel, error);
+            }
+        };
     }
 
 }

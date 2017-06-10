@@ -4,16 +4,21 @@ import io.undertow.websockets.core.BufferedBinaryMessage;
 import io.undertow.websockets.core.BufferedTextMessage;
 import io.undertow.websockets.core.CloseMessage;
 import io.undertow.websockets.core.WebSocketChannel;
-import io.undertow.websockets.spi.WebSocketHttpExchange;
 
 /**
  * Created by Josh Gontijo on 6/8/17.
  */
 public class WebSocketClientEndpoint {
 
-    protected void onConnect(WebSocketChannel channel, WebSocketHttpExchange exchange) {
+    protected void onConnect(WebSocketChannel channel) {
     }
 
+    /**
+     * Called when the server closes the connection
+     * @param channel The client channel
+     * @param message the close message sent by the server, may be null
+     * @return If a reconnection should be attempted, false by default
+     */
     protected void onClose(WebSocketChannel channel, CloseMessage message) {
     }
 
@@ -23,13 +28,13 @@ public class WebSocketClientEndpoint {
     protected void onPong(WebSocketChannel channel, BufferedBinaryMessage message) {
     }
 
-    protected void onText(WebSocketChannel channel, BufferedTextMessage message) {
+    protected void onText(WebSocketChannel channel, BufferedTextMessage message)  {
     }
 
     protected void onBinary(WebSocketChannel channel, BufferedBinaryMessage message) {
     }
 
-    protected void onError(WebSocketChannel channel, Exception error) {
+    protected void onError(WebSocketChannel channel, Exception error)  {
     }
 
 }

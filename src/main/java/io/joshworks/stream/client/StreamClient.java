@@ -39,7 +39,7 @@ import java.util.concurrent.ScheduledExecutorService;
  */
 public final class StreamClient {
 
-    private static ScheduledExecutorService retryExecutor = Executors.newScheduledThreadPool(2);
+    private static final ConnectionMonitor monitor = new ConnectionMonitor();
 
     private static final Logger logger = LoggerFactory.getLogger(StreamClient.class);
     private static final String CLIENT_WORKER_NAME = "client-worker";
@@ -53,11 +53,12 @@ public final class StreamClient {
 
     private static StreamClient INSTANCE;
 
+    private final ScheduledExecutorService scheduler;
     private final XnioWorker worker;
 
-
-    private StreamClient(XnioWorker worker) {
+    private StreamClient(XnioWorker worker, ScheduledExecutorService scheduler) {
         this.worker = worker;
+        this.scheduler = scheduler;
     }
 
     public static void configure(OptionMap options) {
@@ -68,24 +69,27 @@ public final class StreamClient {
         StreamClient.options = options;
     }
 
-    public synchronized static void close() {
+    public synchronized static void shutdown() {
+        monitor.closeAll();
         if (INSTANCE != null) {
             logger.info("Shutting down StreamClient workers");
             INSTANCE.worker.shutdownNow();
+            INSTANCE.scheduler.shutdownNow();
             INSTANCE = null;
         }
     }
 
-    private static XnioWorker getWorker() {
+    private static StreamClient instance() {
         if (INSTANCE == null) {
             synchronized (StreamClient.class) {
                 if (INSTANCE == null) {
                     XnioWorker workers = createWorkers();
-                    INSTANCE = new StreamClient(workers);
+                    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+                    INSTANCE = new StreamClient(workers, scheduler);
                 }
             }
         }
-        return INSTANCE.worker;
+        return INSTANCE;
     }
 
     private static XnioWorker createWorkers() {
@@ -97,19 +101,23 @@ public final class StreamClient {
     }
 
     public static WsConfiguration ws(String url) {
-        return new WsConfiguration(url, getWorker());
+        StreamClient instance = instance();
+        return new WsConfiguration(url, instance.worker, instance.scheduler, monitor);
     }
 
     public static WsConnection connect(String url, WebSocketClientEndpoint endpoint) {
-        return new WsConfiguration(url, getWorker(), endpoint).connect();
+        StreamClient instance = instance();
+        return new WsConfiguration(url,instance.worker, instance.scheduler, monitor, endpoint).connect();
     }
 
     public static SseConfiguration sse(String url) {
-        return new SseConfiguration(url, getWorker());
+        StreamClient instance = instance();
+        return new SseConfiguration(url, instance.worker, instance.scheduler, monitor);
     }
 
     public static SSEConnection connect(String url, SseClientCallback clientCallback) {
-        return new SseConfiguration(url, getWorker(), clientCallback).connect();
+        StreamClient instance = instance();
+        return new SseConfiguration(url, instance.worker, instance.scheduler, monitor, clientCallback).connect();
     }
 
 }

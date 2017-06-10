@@ -30,7 +30,7 @@ public class App {
                         .onEvent((data) -> System.out.println("New event: " + data))
                         .connect();
                         
-                        //onClose
+                        onServerCloserClose
                         //onOpen
                         //OnError
         
@@ -74,26 +74,6 @@ public class App {
       
         SSEConnection connection = StreamClient.connect("http://my-service/sse", new StreamHandler());
                              
-        //then...
-        String lastEventId = connection.close();
-        
-    }
-}
-```
-
-### Connection retry and retry interval
-```java
-public class App {
-
-    public static void main(final String[] args) {
-      
-        SSEConnection connection = StreamClient.sse("http://my-service/sse")
-                              .retryInterval(5000)
-                              .maxRetries(10)
-                              .onEvent((data) -> System.out.println("New event: " + data))
-                              .connect();
-        
-        
         //then...
         String lastEventId = connection.close();
         
@@ -164,8 +144,7 @@ public class App {
 }
 ```
 
-### Reconnecting
-When a connection gets dropped with status codes 1001 or 1011 (as defined [Here](http://tools.ietf.org/html/rfc6455#section-7.4)) then the client will retry to reconnect.
+### Connection retry
 
 ```java
 
@@ -174,6 +153,25 @@ public class App {
     public static void main(final String[] args) {
     
            StreamClient.ws("http://my-service/ws")
+                    .maxRetries(100)
+                    .retryInterval(5000)
+                    .connect();
+    
+    }
+}
+```
+
+### Reconnection
+If the conection gets dropped by the server, the client by default, will close all the resources and reconnect.
+To disable auto reconnection use `autoReconnect(false)`
+```java
+
+public class App {
+
+    public static void main(final String[] args) {
+    
+           StreamClient.ws("http://my-service/ws")
+                    .autoReconnect(false)
                     .maxRetries(100)
                     .retryInterval(5000)
                     .connect();

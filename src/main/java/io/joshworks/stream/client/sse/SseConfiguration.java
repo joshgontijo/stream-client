@@ -1,35 +1,33 @@
 package io.joshworks.stream.client.sse;
 
+import io.joshworks.stream.client.ClientConfiguration;
+import io.joshworks.stream.client.ConnectionMonitor;
 import org.xnio.XnioWorker;
 
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Consumer;
 
 /**
  * Created by Josh Gontijo on 6/8/17.
  */
-public class SseConfiguration {
-    private final String url;
-    private final XnioWorker worker;
-    private String lastEventId;
+public class SseConfiguration extends ClientConfiguration {
 
-    private int retryInterval = 2000;
-    private int maxRetries = -1;
+    private SseClientCallback clientCallback;
+    private String lastEventId;
 
     private Runnable onOpen = () -> {};
     private Consumer<EventData> onEvent = (eventData) -> {};
     private Consumer<String> onClose = (lastEventId) -> {};
     private Consumer<Exception> onError = (e) -> {};
 
-    public SseConfiguration(String url, XnioWorker worker) {
-        this.url = url;
-        this.worker = worker;
+    public SseConfiguration(String url, XnioWorker worker, ScheduledExecutorService scheduler, ConnectionMonitor register) {
+        super(url, worker, scheduler, register);
     }
 
-    public SseConfiguration(String url, XnioWorker worker, SseClientCallback clientCallback) {
-        this(url, worker);
-        this.onOpen = clientCallback::onOpen;
-        this.onEvent = clientCallback::onEvent;
-        this.onError = clientCallback::onError;
+    public SseConfiguration(String url, XnioWorker worker, ScheduledExecutorService scheduler,
+                            ConnectionMonitor register, SseClientCallback clientCallback) {
+        super(url, worker, scheduler, register);
+        this.clientCallback = clientCallback;
     }
 
     public SseConfiguration onOpen(Runnable onOpen) {
@@ -67,9 +65,21 @@ public class SseConfiguration {
         return this;
     }
 
+    public SseConfiguration autoReconnect(boolean autoReconnect) {
+        this.autoReconnect = autoReconnect;
+        return this;
+    }
 
     public SSEConnection connect() {
-        SseClientCallback callback = new SseClientCallback() {
+        clientCallback = clientCallback == null ? createClientCallback() : clientCallback;
+
+        SSEConnection connection = new SSEConnection(url, worker, scheduler, monitor, retryInterval, maxRetries, autoReconnect, clientCallback);
+        connection.connect(lastEventId);
+        return connection;
+    }
+
+    private SseClientCallback createClientCallback() {
+        return  new SseClientCallback() {
             @Override
             public void onEvent(EventData event) {
                 onEvent.accept(event);
@@ -90,10 +100,6 @@ public class SseConfiguration {
                 onError.accept(e);
             }
         };
-
-        SSEConnection connection = new SSEConnection(url, callback, worker, retryInterval, maxRetries);
-        connection.connect(lastEventId);
-        return connection;
     }
 
 

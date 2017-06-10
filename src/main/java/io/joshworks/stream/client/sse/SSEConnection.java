@@ -19,6 +19,8 @@ package io.joshworks.stream.client.sse;
 
 
 import io.joshworks.stream.client.ClientException;
+import io.joshworks.stream.client.ConnectionMonitor;
+import io.joshworks.stream.client.StreamConnection;
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
 import io.undertow.client.ClientExchange;
@@ -39,7 +41,6 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.net.URI;
 import java.nio.channels.Channel;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -47,33 +48,35 @@ import java.util.concurrent.TimeUnit;
 /**
  * Created by Josh Gontijo on 4/1/17.
  */
-public class SSEConnection {
+public class SSEConnection extends StreamConnection {
 
     private static final Logger logger = LoggerFactory.getLogger(SSEConnection.class);
 
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-
     private final String url;
-    private long reconnectInterval;
-    private int maxRetries;
-    private int retries = 0;
 
     final SseClientCallback callback;
     private XnioWorker worker;
     private ClientConnection connection;
     String lastEventId; //updated from EventStreamParser
 
-    public SSEConnection(String url, SseClientCallback callback, XnioWorker worker, int reconnectInterval, int maxRetries) {
+    public SSEConnection(String url, XnioWorker worker, ScheduledExecutorService scheduler,
+                         ConnectionMonitor register, int reconnectInterval, int maxRetries, boolean autoReconnect, SseClientCallback callback) {
+
+        super(url, scheduler, register, reconnectInterval, maxRetries, autoReconnect);
         this.url = url;
         this.callback = callback;
         this.worker = worker;
-        this.reconnectInterval = reconnectInterval;
-        this.maxRetries = maxRetries;
+    }
+
+    @Override
+    public void connect() {
+        connect(null);
     }
 
 
-    void connect(String lastEvent) {
+    public void connect(String lastEvent) {
         try {
+            logger.info("Connecting to {}", url);
             //avoid override on reconnection
             this.lastEventId = lastEvent == null ? this.lastEventId : lastEvent;
 
@@ -101,11 +104,17 @@ public class SSEConnection {
 
         } catch (ConnectException e) {
             logger.warn("Could not connect to " + url, e);
-            callback.onError(e);
-            close(true);
+            try {
+                callback.onError(e);
+            } catch (Exception ex) {
+                logger.error(e.getMessage(), e);
+            }
+            close();
+            retry(false);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
     }
 
     /**
@@ -114,33 +123,23 @@ public class SSEConnection {
      * @return Last-Event-ID if any
      */
     public String close() {
-        return close(false);
-    }
-
-    private String close(boolean retry) {
         if (connection != null) {
-            IoUtils.safeClose(connection);
+            if (connection.isOpen()) {
+                IoUtils.safeClose(connection);
+            }
             connection = null;
             callback.onClose(lastEventId);
         }
-        if (retry) {
-            retry();
-        }
+        monitor.remove(uuid);
         return lastEventId;
     }
 
-    private void retry() {
-        if(retries++ > maxRetries && maxRetries >= 0) {
-            logger.warn("Max retries ({}) exceeded, not reconnecting");
-            return;
-        }
-        retryAfter(reconnectInterval);
-    }
 
     public boolean isOpen() {
         return connection != null && connection.isOpen();
     }
 
+    //Used only for Retry-After header
     void retryAfter(long timeMilli) {
         logger.info("Reconnecting after {}ms", timeMilli);
         scheduler.schedule(() -> this.connect(lastEventId), timeMilli, TimeUnit.MILLISECONDS);
@@ -153,13 +152,15 @@ public class SSEConnection {
             @Override
             public void completed(ClientExchange connectedExchange) {
                 connectedExchange.setResponseListener(new StreamHandler(callback, eventStreamParser));
-                retries = 0; //successful, reset counter
+                monitor.add(uuid, () -> close());
+                logger.info("Connected to {}", url);
             }
 
             @Override
             public void failed(IOException e) {
                 callback.onError(e);
-                close(true);
+                close();
+                retry(true);
             }
         };
     }
@@ -185,9 +186,11 @@ public class SSEConnection {
             }
             callback.onOpen();
 
-            result.getResponseChannel().getCloseSetter().set((ChannelListener<Channel>) channel -> close(true));
+            result.getResponseChannel().getCloseSetter().set((ChannelListener<Channel>) channel -> {
+                close();
+                retry(true);
+            });
             listener.setup(result.getResponseChannel());
-
 
             result.getResponseChannel().resumeReads();
         }
