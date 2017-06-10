@@ -22,7 +22,7 @@ public class ConnectionMonitor {
         connections.remove(uuid);
     }
 
-    public void closeAll() {
+    void closeAll() {
         for (Map.Entry<String, Runnable> entry : connections.entrySet()) {
             try {
                 logger.info("Shutting down client connection with uuid: {}", entry.getKey());

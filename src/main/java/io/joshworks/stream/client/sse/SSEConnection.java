@@ -33,7 +33,6 @@ import io.undertow.util.Methods;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xnio.ChannelListener;
-import org.xnio.IoUtils;
 import org.xnio.OptionMap;
 import org.xnio.XnioWorker;
 
@@ -70,15 +69,14 @@ public class SSEConnection extends StreamConnection {
 
     @Override
     public void connect() {
-        connect(null);
+        connect(lastEventId);
     }
 
 
-    public void connect(String lastEvent) {
+    public synchronized void connect(String lastEvent) {
         try {
+            shuttingDown = false;
             logger.info("Connecting to {}", url);
-            //avoid override on reconnection
-            this.lastEventId = lastEvent == null ? this.lastEventId : lastEvent;
 
             if (connection != null) {
                 return;
@@ -109,7 +107,7 @@ public class SSEConnection extends StreamConnection {
             } catch (Exception ex) {
                 logger.error(e.getMessage(), e);
             }
-            close();
+            closeChannel();
             retry(false);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -123,10 +121,13 @@ public class SSEConnection extends StreamConnection {
      * @return Last-Event-ID if any
      */
     public String close() {
+        shuttingDown = true;
+        return closeChannel();
+    }
+
+    private String closeChannel() {
         if (connection != null) {
-            if (connection.isOpen()) {
-                IoUtils.safeClose(connection);
-            }
+            super.closeChannel(connection);
             connection = null;
             callback.onClose(lastEventId);
         }
@@ -159,7 +160,7 @@ public class SSEConnection extends StreamConnection {
             @Override
             public void failed(IOException e) {
                 callback.onError(e);
-                close();
+                closeChannel();
                 retry(true);
             }
         };
@@ -187,7 +188,7 @@ public class SSEConnection extends StreamConnection {
             callback.onOpen();
 
             result.getResponseChannel().getCloseSetter().set((ChannelListener<Channel>) channel -> {
-                close();
+                closeChannel();
                 retry(true);
             });
             listener.setup(result.getResponseChannel());

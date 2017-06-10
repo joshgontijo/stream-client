@@ -11,7 +11,6 @@ import io.undertow.websockets.core.WebSockets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xnio.ChannelListener;
-import org.xnio.IoUtils;
 import org.xnio.XnioWorker;
 
 import java.io.IOException;
@@ -44,11 +43,13 @@ public class WsConnection extends StreamConnection {
         this.endpoint = endpoint;
     }
 
-    public void connect() {
+    public synchronized void connect() {
         try {
             if (webSocketChannel != null) {
                 return;
             }
+            shuttingDown = false;
+
             logger.info("Connecting to {}", url);
             webSocketChannel = new WebSocketClient.ConnectionBuilder(
                     worker,
@@ -96,12 +97,10 @@ public class WsConnection extends StreamConnection {
         closeChannel();
     }
 
-    private void closeChannel() {
+    private synchronized void closeChannel() {
         if (webSocketChannel != null) {
-            if (webSocketChannel.isOpen()) {
-                clientClose = true;
-                IoUtils.safeClose(webSocketChannel);
-            }
+            super.closeChannel(webSocketChannel);
+            clientClose = true;
             webSocketChannel = null;
             monitor.remove(uuid);
         }

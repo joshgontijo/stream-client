@@ -119,7 +119,6 @@ public class ServerSentEventTest {
             @Override
             public void onError(Exception e) {
                 e.printStackTrace();
-                fail(e.getMessage());
             }
         });
 
@@ -336,7 +335,7 @@ public class ServerSentEventTest {
 
         init(); //server startup
 
-        if (!messageReceived.await(5, TimeUnit.SECONDS)) {
+        if (!messageReceived.await(10, TimeUnit.SECONDS)) {
             fail("No message was received after connection retry");
         }
 

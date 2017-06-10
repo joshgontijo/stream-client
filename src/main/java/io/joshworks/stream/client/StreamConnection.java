@@ -3,6 +3,8 @@ package io.joshworks.stream.client;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.channels.Channel;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -22,7 +24,7 @@ public abstract class StreamConnection {
     private final long reconnectInterval;
     private final int maxRetries;
     private int retries = 0;
-    private boolean shuttingDown = false;
+    protected boolean shuttingDown = false;
     private boolean autoReconnect = false;
 
     public StreamConnection(String url, ScheduledExecutorService scheduler, ConnectionMonitor monitor,
@@ -38,11 +40,21 @@ public abstract class StreamConnection {
 
     public abstract void connect();
 
+    protected void closeChannel(Channel channel) {
+        if (channel != null && channel.isOpen()) {
+            try {
+                channel.close();
+            } catch (IOException e) {
+                logger.error("Error while closing channel", e);
+            }
+        }
+    }
+
     protected void retry(boolean isReconnection) {
         if (retries++ > maxRetries && maxRetries >= 0) {
             throw new MaxRetryExceeded("Max retries (" + maxRetries + ") exceeded, not reconnecting");
         }
-        if(shuttingDown || (isReconnection && !autoReconnect)) {
+        if (shuttingDown || (isReconnection && !autoReconnect)) {
             return;
         }
         logger.info("Trying to connect to {} in {}ms, retry {} of {}", url, reconnectInterval, retries, maxRetries);
