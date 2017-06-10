@@ -59,6 +59,10 @@ public abstract class StreamConnection {
         }
         logger.info("Trying to connect to {} in {}ms, retry {} of {}", url, reconnectInterval, retries, maxRetries);
         try {
+            if(scheduler.isTerminated() || scheduler.isShutdown()) {
+                logger.warn("Scheduler service shutdown, not reconnecting");
+                return;
+            }
             scheduler.schedule(() -> {
                 this.connect();
                 retries = 0;

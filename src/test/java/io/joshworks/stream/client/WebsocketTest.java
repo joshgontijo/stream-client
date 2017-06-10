@@ -25,6 +25,7 @@ import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.WebSockets;
 import io.undertow.websockets.spi.WebSocketHttpExchange;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -72,9 +73,13 @@ public class WebsocketTest {
     }
 
     @After
-    public void shutdown() {
-        StreamClient.shutdown();
+    public void stopServer() {
         stop();
+    }
+
+    @AfterClass
+    public static void shutdown() {
+        StreamClient.shutdown();
     }
 
     @Test

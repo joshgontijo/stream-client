@@ -22,6 +22,7 @@ import io.joshworks.stream.client.sse.EventData;
 import io.joshworks.stream.client.sse.SSEConnection;
 import io.joshworks.stream.client.sse.SseClientCallback;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -78,7 +79,12 @@ public class ServerSentEventTest {
     }
 
     @After
-    public void shutdown() {
+    public void stopServer() {
+        stop();
+    }
+
+    @AfterClass
+    public static void shutdown() {
         StreamClient.shutdown();
         stop();
     }
@@ -281,7 +287,6 @@ public class ServerSentEventTest {
             @Override
             public void onError(Exception e) {
                 e.printStackTrace();
-
             }
         });
 
