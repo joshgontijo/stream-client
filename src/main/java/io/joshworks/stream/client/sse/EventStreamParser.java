@@ -26,7 +26,7 @@ public class EventStreamParser {
     private static final String DATA = "data";
     private static final String ID = "id";
     private static final String EVENT = "event";
-    private static final String RETRY = "retry";
+    private static final String RETRY = "autoReconnect";
 
     private static final String DEFAULT_EVENT = "message";
     private static final String LINE_BREAK = "\n";

@@ -45,6 +45,16 @@ public class SseConfiguration extends ClientConfiguration {
         return this;
     }
 
+    public SseConfiguration onFailedAttempt(Runnable onFailedAttempt) {
+        this.onFailedAttempt = onFailedAttempt;
+        return this;
+    }
+
+    public SseConfiguration onRetriesExceeded(Runnable onRetriesExceeded) {
+        this.onRetriesExceeded = onRetriesExceeded;
+        return this;
+    }
+
     public SseConfiguration onError(Consumer<Exception> onError) {
         this.onError = onError;
         return this;
@@ -55,31 +65,36 @@ public class SseConfiguration extends ClientConfiguration {
         return this;
     }
 
-    public SseConfiguration retryInterval(int retryInterval) {
-        this.retryInterval = retryInterval;
-        return this;
-    }
-
     public SseConfiguration maxRetries(int maxRetries) {
         this.maxRetries = maxRetries;
         return this;
     }
 
-    public SseConfiguration autoReconnect(boolean autoReconnect) {
-        this.autoReconnect = autoReconnect;
+    public SseConfiguration retryInterval(int retryInterval) {
+        this.retryInterval = retryInterval;
+        return this;
+    }
+
+    public SseConfiguration autoReconnect(boolean reconnect) {
+        this.autoReconnect = reconnect;
+        return this;
+    }
+
+    public SseConfiguration clientCallback(SseClientCallback callback) {
+        this.clientCallback = callback;
         return this;
     }
 
     public SSEConnection connect() {
         clientCallback = clientCallback == null ? createClientCallback() : clientCallback;
 
-        SSEConnection connection = new SSEConnection(url, worker, scheduler, monitor, retryInterval, maxRetries, autoReconnect, clientCallback);
-        connection.connect(lastEventId);
+        SSEConnection connection = new SSEConnection(this, lastEventId, clientCallback);
+        connection.connect();
         return connection;
     }
 
     private SseClientCallback createClientCallback() {
-        return  new SseClientCallback() {
+        return new SseClientCallback() {
             @Override
             public void onEvent(EventData event) {
                 onEvent.accept(event);
@@ -101,7 +116,6 @@ public class SseConfiguration extends ClientConfiguration {
             }
         };
     }
-
 
 
 }

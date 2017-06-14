@@ -14,9 +14,12 @@ public class ClientConfiguration {
     protected final ScheduledExecutorService scheduler;
     protected final ConnectionMonitor monitor;
 
-    protected int retryInterval = 2000;
-    protected int maxRetries = -1;
-    protected boolean autoReconnect = true;
+    protected long retryInterval = 2000;
+    protected int maxRetries = 0;
+    protected boolean autoReconnect = false;
+
+    protected Runnable onFailedAttempt = () -> {};
+    protected Runnable onRetriesExceeded = () -> {};
 
     public ClientConfiguration(String url, XnioWorker worker, ScheduledExecutorService scheduler, ConnectionMonitor monitor) {
         this.url = url;
@@ -24,4 +27,5 @@ public class ClientConfiguration {
         this.scheduler = scheduler;
         this.monitor = monitor;
     }
+
 }

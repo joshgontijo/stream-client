@@ -80,6 +80,16 @@ public class WsConfiguration extends ClientConfiguration {
         return this;
     }
 
+    public WsConfiguration onFailedAttempt(Runnable onFailedAttempt) {
+        this.onFailedAttempt = onFailedAttempt;
+        return this;
+    }
+
+    public WsConfiguration onRetriesExceeded(Runnable onRetriesExceeded) {
+        this.onRetriesExceeded = onRetriesExceeded;
+        return this;
+    }
+
     public WsConfiguration retryInterval(int retryInterval) {
         this.retryInterval = retryInterval;
         return this;
@@ -90,14 +100,19 @@ public class WsConfiguration extends ClientConfiguration {
         return this;
     }
 
-    public WsConfiguration autoReconnect(boolean autoReconnect) {
-        this.autoReconnect = autoReconnect;
+    public WsConfiguration autoReconnect(boolean reconnect) {
+        this.autoReconnect = reconnect;
+        return this;
+    }
+
+    public WsConfiguration clientEndpoint(WebSocketClientEndpoint endpoint) {
+        this.endpoint = endpoint;
         return this;
     }
 
     public WsConnection connect() {
         endpoint = endpoint == null ? createEndpoint() : endpoint;
-        WsConnection wsConnection = new WsConnection(url, worker, maxRetries, retryInterval, autoReconnect, scheduler, monitor, endpoint);
+        WsConnection wsConnection = new WsConnection(this, endpoint);
         wsConnection.connect();
 
         return wsConnection;

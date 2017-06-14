@@ -2,6 +2,7 @@ package io.joshworks.stream.client;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xnio.XnioWorker;
 
 import java.io.IOException;
 import java.nio.channels.Channel;
@@ -16,31 +17,45 @@ public abstract class StreamConnection {
 
     private static final Logger logger = LoggerFactory.getLogger(StreamConnection.class);
 
-    protected String url;
-    protected final ScheduledExecutorService scheduler;
+    protected final String url;
+    protected final XnioWorker worker;
     protected final String uuid;
-
     protected final ConnectionMonitor monitor;
+    private final ScheduledExecutorService scheduler;
+
     private final long reconnectInterval;
     private final int maxRetries;
-    private int retries = 0;
-    protected boolean shuttingDown = false;
-    private boolean autoReconnect = false;
+    private final boolean autoReconnect;
 
-    public StreamConnection(String url, ScheduledExecutorService scheduler, ConnectionMonitor monitor,
-                            long reconnectInterval, int maxRetries, boolean autoReconnect) {
-        this.url = url;
-        this.scheduler = scheduler;
-        this.monitor = monitor;
-        this.reconnectInterval = reconnectInterval;
-        this.maxRetries = maxRetries;
-        this.autoReconnect = autoReconnect;
+    private final Runnable onFailedAttempt;
+    private final Runnable onRetriesExceeded;
+
+    protected boolean shuttingDown = false;
+    private int retries = 0;
+
+    public StreamConnection(ClientConfiguration clientConfiguration) {
         this.uuid = UUID.randomUUID().toString().substring(0, 8);
+        this.url = clientConfiguration.url;
+        this.scheduler = clientConfiguration.scheduler;
+        this.monitor = clientConfiguration.monitor;
+        this.reconnectInterval = clientConfiguration.retryInterval;
+        this.maxRetries = clientConfiguration.maxRetries;
+        this.autoReconnect = clientConfiguration.autoReconnect;
+        this.worker = clientConfiguration.worker;
+        this.onFailedAttempt = clientConfiguration.onFailedAttempt;
+        this.onRetriesExceeded = clientConfiguration.onRetriesExceeded;
     }
 
-    public abstract void connect();
+    protected abstract void tryConnect() throws Exception;
 
-    protected void closeChannel(Channel channel) {
+    protected abstract void closeChannel();
+
+    public void connect() {
+        shuttingDown = false;
+        this.tryConnect(false, 0);
+    }
+
+    protected static void closeChannel(Channel channel) {
         if (channel != null && channel.isOpen()) {
             try {
                 channel.close();
@@ -50,27 +65,50 @@ public abstract class StreamConnection {
         }
     }
 
-    protected void retry(boolean isReconnection) {
+
+    protected void retry() {
+        if (maxRetries == 0) {
+            onRetriesExceeded.run();
+        }
+        tryConnect(false, reconnectInterval);
+    }
+
+    protected void reconnect() {
+        if (autoReconnect) {
+            logger.info("Connection closed. Not reconnecting");
+        }
+        tryConnect(true, reconnectInterval);
+    }
+
+    protected void tryConnect(boolean isReconnection, long delay) {
         if (retries++ > maxRetries && maxRetries >= 0) {
+            onRetriesExceeded.run();
             throw new MaxRetryExceeded("Max retries (" + maxRetries + ") exceeded, not reconnecting");
         }
         if (shuttingDown || (isReconnection && !autoReconnect)) {
             return;
         }
-        logger.info("Trying to connect to {} in {}ms, retry {} of {}", url, reconnectInterval, retries, maxRetries);
+
+        logger.info("Trying to connect to {} in {}ms, autoReconnect {} of {}", url, reconnectInterval, retries, maxRetries);
         try {
-            if(scheduler.isTerminated() || scheduler.isShutdown()) {
+            if (scheduler.isTerminated() || scheduler.isShutdown()) {
                 logger.warn("Scheduler service shutdown, not reconnecting");
                 return;
             }
             scheduler.schedule(() -> {
-                this.connect();
+                try {
+                    this.tryConnect();
+                } catch (Exception e) {
+                    onFailedAttempt.run();
+                    closeChannel();
+                    retry();
+                }
                 retries = 0;
-            }, reconnectInterval, TimeUnit.MILLISECONDS);
+            }, delay, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             logger.error("Error while scheduling reconnection", e);
         }
-
     }
+
 
 }

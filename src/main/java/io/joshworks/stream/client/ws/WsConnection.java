@@ -1,6 +1,6 @@
 package io.joshworks.stream.client.ws;
 
-import io.joshworks.stream.client.ConnectionMonitor;
+import io.joshworks.stream.client.ClientConfiguration;
 import io.joshworks.stream.client.StreamConnection;
 import io.undertow.server.DefaultByteBufferPool;
 import io.undertow.server.protocol.framed.AbstractFramedChannel;
@@ -11,12 +11,10 @@ import io.undertow.websockets.core.WebSockets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xnio.ChannelListener;
-import org.xnio.XnioWorker;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
-import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Created by Josh Gontijo on 6/8/17.
@@ -25,25 +23,19 @@ public class WsConnection extends StreamConnection {
 
     private static final Logger logger = LoggerFactory.getLogger(WsConnection.class);
 
-    private final String url;
-    private final XnioWorker worker;
-    private final boolean autoReconnect;
     private final WebSocketClientEndpoint endpoint;
-
     private boolean clientClose = false;
     private WebSocketChannel webSocketChannel;
 
 
-    WsConnection(String url, XnioWorker worker, int maxRetries, int retryInterval, boolean autoReconnect,
-                 ScheduledExecutorService scheduler, ConnectionMonitor monitor, WebSocketClientEndpoint endpoint) {
-        super(url, scheduler, monitor, retryInterval, maxRetries, autoReconnect);
-        this.url = url;
-        this.worker = worker;
-        this.autoReconnect = autoReconnect;
+    WsConnection(ClientConfiguration configuration, WebSocketClientEndpoint endpoint) {
+        super(configuration);
         this.endpoint = endpoint;
     }
 
-    public synchronized void connect() {
+
+    @Override
+    protected synchronized void tryConnect() throws IOException {
         try {
             if (webSocketChannel != null) {
                 return;
@@ -66,7 +58,7 @@ public class WsConnection extends StreamConnection {
                 if(!clientClose) {
                     closeChannel();
                     proxyClientEndpoint.onCloseMessage(null, webSocketChannel);
-                    retry(true);
+                    reconnect();
                 }
             });
 
@@ -78,9 +70,8 @@ public class WsConnection extends StreamConnection {
             clientClose = false;
 
         } catch (Exception e) {
-            logger.warn("Could not connect to " + url, e);
-            close();
-            retry(false);
+            logger.warn("Could not tryConnect to " + url, e);
+            throw e;
         }
     }
 
@@ -97,9 +88,10 @@ public class WsConnection extends StreamConnection {
         closeChannel();
     }
 
-    private synchronized void closeChannel() {
+    @Override
+    protected synchronized void closeChannel() {
         if (webSocketChannel != null) {
-            super.closeChannel(webSocketChannel);
+            StreamConnection.closeChannel(webSocketChannel);
             clientClose = true;
             webSocketChannel = null;
             monitor.remove(uuid);

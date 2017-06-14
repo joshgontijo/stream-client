@@ -52,7 +52,6 @@ public class EventStreamChannelListener implements ChannelListener<StreamSourceC
         process(channel);
         channel.getReadSetter().set(this);
         channel.resumeReads();
-
     }
 
     private void process(final StreamSourceChannel channel) {

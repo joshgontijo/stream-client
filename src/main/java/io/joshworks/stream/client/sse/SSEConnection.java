@@ -18,8 +18,8 @@
 package io.joshworks.stream.client.sse;
 
 
+import io.joshworks.stream.client.ClientConfiguration;
 import io.joshworks.stream.client.ClientException;
-import io.joshworks.stream.client.ConnectionMonitor;
 import io.joshworks.stream.client.StreamConnection;
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
@@ -34,14 +34,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xnio.ChannelListener;
 import org.xnio.OptionMap;
-import org.xnio.XnioWorker;
 
 import java.io.IOException;
-import java.net.ConnectException;
 import java.net.URI;
 import java.nio.channels.Channel;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -51,29 +47,18 @@ public class SSEConnection extends StreamConnection {
 
     private static final Logger logger = LoggerFactory.getLogger(SSEConnection.class);
 
-    private final String url;
-
     final SseClientCallback callback;
-    private XnioWorker worker;
     private ClientConnection connection;
     String lastEventId; //updated from EventStreamParser
 
-    public SSEConnection(String url, XnioWorker worker, ScheduledExecutorService scheduler,
-                         ConnectionMonitor register, int reconnectInterval, int maxRetries, boolean autoReconnect, SseClientCallback callback) {
-
-        super(url, scheduler, register, reconnectInterval, maxRetries, autoReconnect);
-        this.url = url;
+    public SSEConnection(ClientConfiguration clientConfiguration, String lastEventId, SseClientCallback callback) {
+        super(clientConfiguration);
+        this.lastEventId = lastEventId;
         this.callback = callback;
-        this.worker = worker;
     }
 
     @Override
-    public void connect() {
-        connect(lastEventId);
-    }
-
-
-    public synchronized void connect(String lastEvent) {
+    protected synchronized void tryConnect() throws Exception {
         try {
             shuttingDown = false;
             logger.info("Connecting to {}", url);
@@ -94,26 +79,23 @@ public class SSEConnection extends StreamConnection {
             request.getRequestHeaders().put(Headers.ACCEPT, "text/event-stream");
             request.getRequestHeaders().put(Headers.HOST, url);
 //            request.getRequestHeaders().put(Headers.ORIGIN, "http://localhost");
-            if (lastEventId != null && !lastEventId.isEmpty()) {
+            if (this.lastEventId != null && !this.lastEventId.isEmpty()) {
                 request.getRequestHeaders().put(HttpString.tryFromString("Last-Event-ID"), this.lastEventId);
             }
 
             connection.sendRequest(request, createClientCallback());
 
-        } catch (ConnectException e) {
-            logger.warn("Could not connect to " + url, e);
+        } catch (Exception e) {
+            logger.warn("Could not tryConnect to " + url, e);
             try {
                 callback.onError(e);
             } catch (Exception ex) {
                 logger.error(e.getMessage(), e);
             }
-            closeChannel();
-            retry(false);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw e;
         }
-
     }
+
 
     /**
      * Close the this connection and return the Last-Event-ID
@@ -122,17 +104,18 @@ public class SSEConnection extends StreamConnection {
      */
     public String close() {
         shuttingDown = true;
-        return closeChannel();
+        closeChannel();
+        return lastEventId;
     }
 
-    private String closeChannel() {
+
+    protected void closeChannel() {
         if (connection != null) {
-            super.closeChannel(connection);
+            StreamConnection.closeChannel(connection);
             connection = null;
             callback.onClose(lastEventId);
         }
         monitor.remove(uuid);
-        return lastEventId;
     }
 
 
@@ -143,7 +126,7 @@ public class SSEConnection extends StreamConnection {
     //Used only for Retry-After header
     void retryAfter(long timeMilli) {
         logger.info("Reconnecting after {}ms", timeMilli);
-        scheduler.schedule(() -> this.connect(lastEventId), timeMilli, TimeUnit.MILLISECONDS);
+        super.tryConnect(false, timeMilli);
     }
 
     private ClientCallback<ClientExchange> createClientCallback() {
@@ -161,7 +144,7 @@ public class SSEConnection extends StreamConnection {
             public void failed(IOException e) {
                 callback.onError(e);
                 closeChannel();
-                retry(true);
+                reconnect();
             }
         };
     }
@@ -185,15 +168,17 @@ public class SSEConnection extends StreamConnection {
                 String status = result.getResponse().getStatus();
                 callback.onError(new ClientException(responseCode, "Server returned [" + responseCode + " - " + status + "] after connecting"));
             }
+
             callback.onOpen();
 
             result.getResponseChannel().getCloseSetter().set((ChannelListener<Channel>) channel -> {
                 closeChannel();
-                retry(true);
+                reconnect();
             });
-            listener.setup(result.getResponseChannel());
 
+            listener.setup(result.getResponseChannel());
             result.getResponseChannel().resumeReads();
+
         }
 
         @Override

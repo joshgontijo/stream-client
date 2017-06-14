@@ -8,6 +8,10 @@ public class StreamConnectionError extends RuntimeException {
         super(message, cause);
     }
 
+    public StreamConnectionError(String message) {
+        super(message);
+    }
+
     public StreamConnectionError(Throwable cause) {
         super(cause);
     }

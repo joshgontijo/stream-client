@@ -84,16 +84,22 @@ public class WebsocketTest {
 
     @Test
     public void connection() throws Exception {
-        final CountDownLatch latch = new CountDownLatch(1);
+        final CountDownLatch onMessage = new CountDownLatch(1);
+        final CountDownLatch onConnect = new CountDownLatch(1);
         final AtomicReference<String> result = new AtomicReference<>();
 
         WsConnection connection = StreamClient.connect(WS_ENDPOINT, new WebSocketClientEndpoint() {
+            @Override
+            protected void onConnect(WebSocketChannel channel) {
+                onConnect.countDown();
+            }
+
             @Override
             protected void onText(WebSocketChannel channel, BufferedTextMessage message) {
                 try {
                     result.set(message.getData());
                     channel.sendClose();
-                    latch.countDown();
+                    onMessage.countDown();
 
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -105,13 +111,34 @@ public class WebsocketTest {
             @Override
             protected void onError(WebSocketChannel channel, Exception error) {
                 error.printStackTrace();
-                latch.countDown();
+                onMessage.countDown();
             }
         });
 
+        if(!onConnect.await(10, TimeUnit.SECONDS)) {
+            fail("onConnect not called");
+        }
         assertTrue(connection.isOpen());
-        latch.await(10, TimeUnit.SECONDS);
+
+        if(!onMessage.await(10, TimeUnit.SECONDS)) {
+            fail("No message was received");
+        }
         assertNotNull(result.get());
+    }
+
+    @Test
+    public void isOpen() throws Exception {
+        final CountDownLatch onConnect = new CountDownLatch(1);
+
+        WsConnection connection = StreamClient.ws(WS_ENDPOINT)
+                .onConnect(channel -> onConnect.countDown())
+                .connect();
+
+        if(!onConnect.await(10, TimeUnit.SECONDS)) {
+            fail("onConnect not called");
+        }
+
+        assertTrue(connection.isOpen());
     }
 
     @Test
@@ -126,7 +153,7 @@ public class WebsocketTest {
 
 
         if (!connected.await(10, TimeUnit.SECONDS)) {
-            fail("Client did not reconnect");
+            fail("Client did not autoReconnect");
         }
 
         assertTrue(connection.isOpen());
@@ -144,7 +171,7 @@ public class WebsocketTest {
                 }).connect();
 
         if (!connected.await(10, TimeUnit.SECONDS)) {
-            fail("Client did not connect");
+            fail("Client did not tryConnect");
         }
 
         connection.close();
@@ -162,7 +189,7 @@ public class WebsocketTest {
                 }).connect();
 
         if (!closed.await(10, TimeUnit.SECONDS)) {
-            fail("Client did not reconnect");
+            fail("Client did not autoReconnect");
         }
 
         assertChannelClosed(connection);
@@ -175,6 +202,7 @@ public class WebsocketTest {
         final CountDownLatch connected = new CountDownLatch(1);
 
         WsConnection connection = StreamClient.ws("ws://localhost:9000/ws")
+                .maxRetries(5)
                 .onConnect(channel -> connected.countDown()).connect();
 
         assertFalse(connection.isOpen());
@@ -182,18 +210,51 @@ public class WebsocketTest {
         setup(); //start
 
         if (!connected.await(10, TimeUnit.SECONDS)) {
-            fail("Client did not reconnect");
+            fail("Client did not autoReconnect");
         }
 
         assertTrue(connection.isOpen());
     }
 
     @Test
-    public void reconnect() throws Exception {
+    public void onRetriesExceeded() throws Exception {
+        stop(); //server not connected
+
+        final CountDownLatch exceeded = new CountDownLatch(1);
+
+        StreamClient.ws("ws://localhost:9000/ws")
+                .onRetriesExceeded(exceeded::countDown)
+                .connect();
+
+        if (!exceeded.await(10, TimeUnit.SECONDS)) {
+            fail("onRetriesExceeded not called");
+        }
+    }
+
+    @Test
+    public void onFailedAttempt() throws Exception {
+        stop(); //server not connected
+
+        final int maxRetries = 2;
+        final CountDownLatch failedAttempt = new CountDownLatch(maxRetries);
+
+        StreamClient.ws("ws://localhost:9000/ws")
+                .onFailedAttempt(failedAttempt::countDown)
+                .maxRetries(2)
+                .connect();
+
+        if (!failedAttempt.await(10, TimeUnit.SECONDS)) {
+            fail("onFailedAttempt not called " + maxRetries + " times");
+        }
+    }
+
+    @Test
+    public void autoReconnect() throws Exception {
         final CountDownLatch firstConnection = new CountDownLatch(1);
         final CountDownLatch secondConnection = new CountDownLatch(2);
 
         WsConnection connection = StreamClient.ws("ws://localhost:9000/ws")
+                .autoReconnect(true)
                 .onConnect(channel -> {
                     firstConnection.countDown();
                     secondConnection.countDown();
@@ -204,7 +265,7 @@ public class WebsocketTest {
                 .connect();
 
         if (!firstConnection.await(10, TimeUnit.SECONDS)) {
-            fail("Client did not connect");
+            fail("Client did not tryConnect");
         }
 
         assertTrue(connection.isOpen());
@@ -214,7 +275,7 @@ public class WebsocketTest {
 
         setup(); //start
         if (!secondConnection.await(10, TimeUnit.SECONDS)) {
-            fail("Client did not reconnect");
+            fail("Client did not autoReconnect");
         }
 
         assertTrue(connection.isOpen());
@@ -228,6 +289,7 @@ public class WebsocketTest {
         WsConnection connection = StreamClient.ws("ws://localhost:9000/ws")
                 .autoReconnect(false)
                 .retryInterval(1000) //must be less than waiting time
+                .maxRetries(10)
                 .onConnect(channel -> {
                     firstConnection.countDown();
                     secondConnection.countDown();
@@ -237,7 +299,7 @@ public class WebsocketTest {
                 }).connect();
 
         if (!firstConnection.await(10, TimeUnit.SECONDS)) {
-            fail("Client did not connect");
+            fail("Client did not tryConnect");
         }
 
         assertTrue(connection.isOpen());
