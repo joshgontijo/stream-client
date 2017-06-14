@@ -223,6 +223,27 @@ public class ServerSentEventTest {
     }
 
     @Test
+    public void onEvent() throws Exception {
+        final CountDownLatch connected = new CountDownLatch(1);
+        final CountDownLatch onEvent = new CountDownLatch(3); //three events
+
+        StreamClient.sse("http://localhost:9000/simple")
+                .onOpen(connected::countDown)
+                .onEvent(data -> onEvent.countDown())
+                .connect();
+
+
+        if (!connected.await(10, TimeUnit.SECONDS)) {
+            fail("Client did not connect");
+        }
+
+        if (!onEvent.await(10, TimeUnit.SECONDS)) {
+            fail("Event not received");
+        }
+
+    }
+
+    @Test
     public void closedByTheClient() throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
         final CountDownLatch messageLatch = new CountDownLatch(3);

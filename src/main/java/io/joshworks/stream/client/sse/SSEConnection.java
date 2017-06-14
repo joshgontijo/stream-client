@@ -25,6 +25,7 @@ import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
 import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
+import io.undertow.client.ClientStatistics;
 import io.undertow.client.UndertowClient;
 import io.undertow.server.DefaultByteBufferPool;
 import io.undertow.util.Headers;
@@ -108,6 +109,9 @@ public class SSEConnection extends StreamConnection {
         return lastEventId;
     }
 
+    public ClientStatistics statistics() {
+        return connection == null ? new DisconnectedStatistics() : connection.getStatistics();
+    }
 
     protected void closeChannel() {
         if (connection != null) {
@@ -120,7 +124,7 @@ public class SSEConnection extends StreamConnection {
 
 
     public boolean isOpen() {
-        return connection != null && connection.isOpen();
+        return connection != null;
     }
 
     //Used only for Retry-After header
@@ -167,6 +171,8 @@ public class SSEConnection extends StreamConnection {
             if (responseCode != 200) {
                 String status = result.getResponse().getStatus();
                 callback.onError(new ClientException(responseCode, "Server returned [" + responseCode + " - " + status + "] after connecting"));
+                closeChannel();
+                return;
             }
 
             callback.onOpen();
@@ -177,13 +183,35 @@ public class SSEConnection extends StreamConnection {
             });
 
             listener.setup(result.getResponseChannel());
-            result.getResponseChannel().resumeReads();
 
         }
 
         @Override
         public void failed(IOException e) {
             callback.onError(e);
+        }
+    }
+
+    public class DisconnectedStatistics implements ClientStatistics {
+
+        @Override
+        public long getRequests() {
+            return 0;
+        }
+
+        @Override
+        public long getRead() {
+            return 0;
+        }
+
+        @Override
+        public long getWritten() {
+            return 0;
+        }
+
+        @Override
+        public void reset() {
+
         }
     }
 }

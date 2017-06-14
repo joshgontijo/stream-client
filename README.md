@@ -8,14 +8,8 @@ Resilient client for Server sent events (SSE) and WebSockets based on Undertow
     <dependency>
         <groupId>io.joshworks.stream</groupId>
         <artifactId>stream-client</artifactId>
-        <version>0.1</version>
+        <version>0.2</version>
     </dependency>
-    <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-simple</artifactId>
-        <version>1.7.25</version>
-    </dependency>
-
 ```
 
 
@@ -147,7 +141,7 @@ public class App {
 ```
 
 ### Connection retry
-
+Disabled by default, to enable use `maxRetries(int retries)`, optionally use `.retryInterval(long intervalMillis)` (default is 2000) 
 ```java
 
 public class App {
@@ -164,8 +158,8 @@ public class App {
 ```
 
 ### Reconnection
-If the conection gets dropped by the server, the client by default, will close all the resources and reconnect.
-To disable auto reconnection use `autoReconnect(false)`
+If the connection gets dropped by the server, the client by default, will close all the resources.
+To enable auto reconnection use `reconnect(true)`
 ```java
 
 public class App {
@@ -173,9 +167,7 @@ public class App {
     public static void main(final String[] args) {
     
            StreamClient.ws("http://my-service/ws")
-                    .autoReconnect(false)
-                    .maxRetries(100)
-                    .retryInterval(5000)
+                    .reconnect(true)
                     .connect();
     
     }
