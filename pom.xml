@@ -6,7 +6,7 @@
 
     <groupId>io.joshworks.stream</groupId>
     <artifactId>stream-client</artifactId>
-    <version>0.2</version>
+    <version>0.3</version>
 
     <name>Stream Client</name>
     <description>Resilient client for Server sent events and WebSockets</description>

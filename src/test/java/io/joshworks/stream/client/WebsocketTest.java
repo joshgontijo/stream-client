@@ -254,7 +254,7 @@ public class WebsocketTest {
         final CountDownLatch secondConnection = new CountDownLatch(2);
 
         WsConnection connection = StreamClient.ws("ws://localhost:9000/ws")
-                .autoReconnect(true)
+                .maxRetries(10)
                 .onConnect(channel -> {
                     firstConnection.countDown();
                     secondConnection.countDown();
@@ -287,9 +287,6 @@ public class WebsocketTest {
         final CountDownLatch secondConnection = new CountDownLatch(2);
 
         WsConnection connection = StreamClient.ws("ws://localhost:9000/ws")
-                .autoReconnect(false)
-                .retryInterval(1000) //must be less than waiting time
-                .maxRetries(10)
                 .onConnect(channel -> {
                     firstConnection.countDown();
                     secondConnection.countDown();

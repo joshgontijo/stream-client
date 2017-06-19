@@ -326,7 +326,7 @@ public class ServerSentEventTest {
         CountDownLatch onClose = new CountDownLatch(1);
 
         SSEConnection connect = StreamClient.sse("http://localhost:9000/id")
-                .autoReconnect(true)
+                .maxRetries(-1)
                 .clientCallback(new SseClientCallback() {
                     @Override
                     public void onEvent(EventData data) {

@@ -70,7 +70,7 @@ public class WsConnection extends StreamConnection {
             clientClose = false;
 
         } catch (Exception e) {
-            logger.warn("Could not tryConnect to " + url, e);
+            logger.warn("Could not connect to " + url, e);
             throw e;
         }
     }

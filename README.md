@@ -8,7 +8,7 @@ Resilient client for Server sent events (SSE) and WebSockets based on Undertow
     <dependency>
         <groupId>io.joshworks.stream</groupId>
         <artifactId>stream-client</artifactId>
-        <version>0.2</version>
+        <version>0.3</version>
     </dependency>
 ```
 

@@ -86,8 +86,9 @@ public class SSEConnection extends StreamConnection {
 
             connection.sendRequest(request, createClientCallback());
 
+            //TODO Connection exception and then retry
         } catch (Exception e) {
-            logger.warn("Could not tryConnect to " + url, e);
+            logger.warn("Could not connect to " + url, e);
             try {
                 callback.onError(e);
             } catch (Exception ex) {
@@ -130,7 +131,7 @@ public class SSEConnection extends StreamConnection {
     //Used only for Retry-After header
     void retryAfter(long timeMilli) {
         logger.info("Reconnecting after {}ms", timeMilli);
-        super.tryConnect(false, timeMilli);
+        reconnect(timeMilli);
     }
 
     private ClientCallback<ClientExchange> createClientCallback() {

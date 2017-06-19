@@ -16,7 +16,6 @@ public class ClientConfiguration {
 
     protected long retryInterval = 2000;
     protected int maxRetries = 0;
-    protected boolean autoReconnect = false;
 
     protected Runnable onFailedAttempt = () -> {};
     protected Runnable onRetriesExceeded = () -> {};

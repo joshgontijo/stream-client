@@ -75,11 +75,6 @@ public class SseConfiguration extends ClientConfiguration {
         return this;
     }
 
-    public SseConfiguration autoReconnect(boolean reconnect) {
-        this.autoReconnect = reconnect;
-        return this;
-    }
-
     public SseConfiguration clientCallback(SseClientCallback callback) {
         this.clientCallback = callback;
         return this;
@@ -91,6 +86,11 @@ public class SseConfiguration extends ClientConfiguration {
         SSEConnection connection = new SSEConnection(this, lastEventId, clientCallback);
         connection.connect();
         return connection;
+    }
+
+    public SSEConnection connect(String lastEventId) {
+        this.lastEventId = lastEventId;
+        return connect();
     }
 
     private SseClientCallback createClientCallback() {

@@ -100,10 +100,6 @@ public class WsConfiguration extends ClientConfiguration {
         return this;
     }
 
-    public WsConfiguration autoReconnect(boolean reconnect) {
-        this.autoReconnect = reconnect;
-        return this;
-    }
 
     public WsConfiguration clientEndpoint(WebSocketClientEndpoint endpoint) {
         this.endpoint = endpoint;
