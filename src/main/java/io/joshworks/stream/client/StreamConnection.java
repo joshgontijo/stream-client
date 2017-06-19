@@ -49,6 +49,7 @@ public abstract class StreamConnection {
     protected abstract void closeChannel();
 
     public void connect() {
+        retries = 0;
         shuttingDown = false;
         this.tryConnect(0);
     }
@@ -68,19 +69,22 @@ public abstract class StreamConnection {
     }
 
     protected void reconnect(long delay) {
-        if (shuttingDown) {
+        if (shuttingDown || maxRetries == 0) {
             return;
         }
-        if (retries++ > maxRetries && maxRetries >= 0) {
+        if (++retries > maxRetries && maxRetries > 0) {
             onRetriesExceeded.run();
-            throw new MaxRetryExceeded("Max retries (" + maxRetries + ") exceeded, not reconnecting");
+            MaxRetryExceeded maxRetryExceeded = new MaxRetryExceeded("Max retries (" + maxRetries + ") exceeded, not reconnecting");
+            logger.error("Max retries exceeded", maxRetryExceeded);
+            closeChannel();
+            return;
         }
         this.tryConnect(delay);
     }
 
     private void tryConnect(long delay) {
-
-        logger.info("Trying to connect to {} in {}ms, autoReconnect {} of {}", url, retryInterval, retries, maxRetries);
+        String maxRetriesLabel = maxRetries < 0 ? "-" : "" + maxRetries;
+        logger.info("Trying to connect to {} in {}ms. {} of {}", url, retryInterval, retries, maxRetriesLabel);
         try {
             if (scheduler.isTerminated() || scheduler.isShutdown()) {
                 logger.warn("Scheduler service shutdown, not reconnecting");
@@ -91,6 +95,7 @@ public abstract class StreamConnection {
                     this.tryConnect();
                     retries = 0;
                 } catch (Exception e) {
+                    logger.warn("Could not connect to {}: {}", url, e.getMessage());
                     onFailedAttempt.run();
                     closeChannel();
                     reconnect();

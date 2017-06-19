@@ -35,44 +35,39 @@ public class WsConnection extends StreamConnection {
 
 
     @Override
-    protected synchronized void tryConnect() throws IOException {
-        try {
-            if (webSocketChannel != null) {
-                return;
-            }
-            shuttingDown = false;
-
-            logger.info("Connecting to {}", url);
-            webSocketChannel = new WebSocketClient.ConnectionBuilder(
-                    worker,
-                    new DefaultByteBufferPool(false, 2048), //TODO configurable ?
-                    URI.create(url))
-                    .connect()
-                    .get();
-
-
-            ProxyClientEndpoint proxyClientEndpoint = new ProxyClientEndpoint(endpoint);
-
-            webSocketChannel.getReceiveSetter().set(proxyClientEndpoint);
-            webSocketChannel.getCloseSetter().set((ChannelListener<AbstractFramedChannel>) channel -> {
-                if(!clientClose) {
-                    closeChannel();
-                    proxyClientEndpoint.onCloseMessage(null, webSocketChannel);
-                    reconnect();
-                }
-            });
-
-            proxyClientEndpoint.onConnect(webSocketChannel);
-            webSocketChannel.resumeReceives();
-
-            monitor.add(uuid, this::closeChannel);
-            logger.info("Connected to {}", url);
-            clientClose = false;
-
-        } catch (Exception e) {
-            logger.warn("Could not connect to " + url, e);
-            throw e;
+    protected synchronized void tryConnect() throws Exception {
+        if (webSocketChannel != null) {
+            return;
         }
+        shuttingDown = false;
+
+        logger.info("Connecting to {}", url);
+        webSocketChannel = new WebSocketClient.ConnectionBuilder(
+                worker,
+                new DefaultByteBufferPool(false, 2048), //TODO configurable ?
+                URI.create(url))
+                .connect()
+                .get();
+
+
+        ProxyClientEndpoint proxyClientEndpoint = new ProxyClientEndpoint(endpoint);
+
+        webSocketChannel.getReceiveSetter().set(proxyClientEndpoint);
+        webSocketChannel.getCloseSetter().set((ChannelListener<AbstractFramedChannel>) channel -> {
+            if(!clientClose) {
+                closeChannel();
+                proxyClientEndpoint.onCloseMessage(null, webSocketChannel);
+                reconnect();
+            }
+        });
+
+        proxyClientEndpoint.onConnect(webSocketChannel);
+        webSocketChannel.resumeReceives();
+
+        monitor.add(uuid, this::closeChannel);
+        logger.info("Connected to {}", url);
+        clientClose = false;
+
     }
 
     public boolean isOpen() {

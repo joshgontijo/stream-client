@@ -372,6 +372,7 @@ public class ServerSentEventTest {
         final CountDownLatch exceeded = new CountDownLatch(1);
 
         StreamClient.sse("http://localhost:9000/id")
+                .maxRetries(1)
                 .onRetriesExceeded(exceeded::countDown)
                 .connect();
 

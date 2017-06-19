@@ -157,22 +157,6 @@ public class App {
 }
 ```
 
-### Reconnection
-If the connection gets dropped by the server, the client by default, will close all the resources.
-To enable auto reconnection use `reconnect(true)`
-```java
-
-public class App {
-
-    public static void main(final String[] args) {
-    
-           StreamClient.ws("http://my-service/ws")
-                    .reconnect(true)
-                    .connect();
-    
-    }
-}
-```
 
 ## XnioWorker configuration ##
 The XnioWorker is shared across all clients (SSE and WS), in case of many connections, the thread pool can be tuned

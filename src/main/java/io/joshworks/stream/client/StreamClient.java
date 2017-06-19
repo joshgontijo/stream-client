@@ -107,7 +107,7 @@ public final class StreamClient {
 
     public static WsConnection connect(String url, WebSocketClientEndpoint endpoint) {
         StreamClient instance = instance();
-        return new WsConfiguration(url,instance.worker, instance.scheduler, monitor, endpoint).connect();
+        return new WsConfiguration(url, instance.worker, instance.scheduler, monitor, endpoint).connect();
     }
 
     public static SseConfiguration sse(String url) {

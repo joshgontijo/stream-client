@@ -88,11 +88,10 @@ public class SSEConnection extends StreamConnection {
 
             //TODO Connection exception and then retry
         } catch (Exception e) {
-            logger.warn("Could not connect to " + url, e);
             try {
                 callback.onError(e);
             } catch (Exception ex) {
-                logger.error(e.getMessage(), e);
+                logger.error("Error handling 'onError' callback", e);
             }
             throw e;
         }
@@ -114,6 +113,7 @@ public class SSEConnection extends StreamConnection {
         return connection == null ? new DisconnectedStatistics() : connection.getStatistics();
     }
 
+    @Override
     protected void closeChannel() {
         if (connection != null) {
             StreamConnection.closeChannel(connection);

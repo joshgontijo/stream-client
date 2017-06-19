@@ -223,6 +223,7 @@ public class WebsocketTest {
         final CountDownLatch exceeded = new CountDownLatch(1);
 
         StreamClient.ws("ws://localhost:9000/ws")
+                .maxRetries(1)
                 .onRetriesExceeded(exceeded::countDown)
                 .connect();
 
