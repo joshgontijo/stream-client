@@ -22,6 +22,8 @@ import io.joshworks.stream.client.sse.EventData;
 import io.joshworks.stream.client.sse.SSEConnection;
 import io.joshworks.stream.client.sse.SseClientCallback;
 import io.undertow.server.handlers.sse.ServerSentEventConnection;
+import io.undertow.util.HeaderValues;
+import io.undertow.util.Headers;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -72,6 +74,10 @@ public class ServerSentEventTest {
 
         sse("/serverClose", (connection, lastEventId) -> serverConnectionRef.set(connection));
 
+        sse("/echoAuthorizationHeader", (connection, lastEventId) -> {
+            HeaderValues authHeader = connection.getRequestHeaders().get(Headers.AUTHORIZATION);
+            connection.send(authHeader.isEmpty() ? "NO HEADER FOUND" : authHeader.getFirst());
+        });
 
         start();
     }
@@ -240,7 +246,6 @@ public class ServerSentEventTest {
         if (!onEvent.await(10, TimeUnit.SECONDS)) {
             fail("Event not received");
         }
-
     }
 
     @Test
@@ -424,6 +429,29 @@ public class ServerSentEventTest {
         if (!messageReceived.await(10, TimeUnit.SECONDS)) {
             fail("No message was received after connection autoReconnect");
         }
+    }
+
+    @Test
+    public void headers() throws Exception {
+
+        final CountDownLatch onEvent = new CountDownLatch(1); //three events
+        final AtomicReference<String> received = new AtomicReference<>();
+
+        final String headerValue = "abc";
+
+        StreamClient.sse("http://localhost:9000/echoAuthorizationHeader")
+                .header(Headers.AUTHORIZATION, headerValue)
+                .onEvent(data -> {
+                    received.set(data.data);
+                    onEvent.countDown();
+                })
+                .connect();
+
+        if (!onEvent.await(10, TimeUnit.SECONDS)) {
+            fail("Event not received");
+        }
+
+        assertEquals(headerValue, received.get());
     }
 
 }

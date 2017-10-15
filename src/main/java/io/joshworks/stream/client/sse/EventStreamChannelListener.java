@@ -17,8 +17,11 @@
 
 package io.joshworks.stream.client.sse;
 
+import io.undertow.client.ClientExchange;
 import io.undertow.connector.ByteBufferPool;
 import io.undertow.connector.PooledByteBuffer;
+import io.undertow.util.HeaderValues;
+import io.undertow.util.Headers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xnio.ChannelListener;
@@ -27,6 +30,7 @@ import org.xnio.channels.StreamSourceChannel;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.zip.GZIPInputStream;
 
 /**
  * Created by Josh Gontijo on 3/31/17.

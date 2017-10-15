@@ -2,6 +2,8 @@ package io.joshworks.stream.client.sse;
 
 import io.joshworks.stream.client.ClientConfiguration;
 import io.joshworks.stream.client.ConnectionMonitor;
+import io.undertow.util.HeaderMap;
+import io.undertow.util.HttpString;
 import org.xnio.XnioWorker;
 
 import java.util.concurrent.ScheduledExecutorService;
@@ -19,6 +21,8 @@ public class SseConfiguration extends ClientConfiguration {
     private Consumer<EventData> onEvent = (eventData) -> {};
     private Consumer<String> onClose = (lastEventId) -> {};
     private Consumer<Exception> onError = (e) -> {};
+    protected HeaderMap headers = new HeaderMap();
+
 
     public SseConfiguration(String url, XnioWorker worker, ScheduledExecutorService scheduler, ConnectionMonitor register) {
         super(url, worker, scheduler, register);
@@ -28,6 +32,16 @@ public class SseConfiguration extends ClientConfiguration {
                             ConnectionMonitor register, SseClientCallback clientCallback) {
         super(url, worker, scheduler, register);
         this.clientCallback = clientCallback;
+    }
+
+    public SseConfiguration header(HttpString name, String value) {
+        headers.put(name, value);
+        return this;
+    }
+
+    public SseConfiguration header(HttpString name, long value) {
+        headers.put(name, value);
+        return this;
     }
 
     public SseConfiguration onOpen(Runnable onOpen) {

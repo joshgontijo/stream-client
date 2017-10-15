@@ -94,6 +94,7 @@ public abstract class StreamConnection {
                 try {
                     this.tryConnect();
                     retries = 0;
+                    logger.info("Connected to {}", url);
                 } catch (Exception e) {
                     logger.warn("Could not connect to {}: {}", url, e.getMessage());
                     onFailedAttempt.run();

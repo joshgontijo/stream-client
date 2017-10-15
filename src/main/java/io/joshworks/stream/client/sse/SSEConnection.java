@@ -18,7 +18,6 @@
 package io.joshworks.stream.client.sse;
 
 
-import io.joshworks.stream.client.ClientConfiguration;
 import io.joshworks.stream.client.ClientException;
 import io.joshworks.stream.client.StreamConnection;
 import io.undertow.client.ClientCallback;
@@ -28,6 +27,8 @@ import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientStatistics;
 import io.undertow.client.UndertowClient;
 import io.undertow.server.DefaultByteBufferPool;
+import io.undertow.util.HeaderMap;
+import io.undertow.util.HeaderValues;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
@@ -49,21 +50,21 @@ public class SSEConnection extends StreamConnection {
     private static final Logger logger = LoggerFactory.getLogger(SSEConnection.class);
 
     final SseClientCallback callback;
+    private final HeaderMap headers;
     private ClientConnection connection;
     String lastEventId; //updated from EventStreamParser
 
-    public SSEConnection(ClientConfiguration clientConfiguration, String lastEventId, SseClientCallback callback) {
+    public SSEConnection(SseConfiguration clientConfiguration, String lastEventId, SseClientCallback callback) {
         super(clientConfiguration);
         this.lastEventId = lastEventId;
         this.callback = callback;
+        this.headers = clientConfiguration.headers;
     }
 
     @Override
     protected synchronized void tryConnect() throws Exception {
         try {
             shuttingDown = false;
-            logger.info("Connecting to {}", url);
-
             if (connection != null) {
                 return;
             }
@@ -80,6 +81,11 @@ public class SSEConnection extends StreamConnection {
             request.getRequestHeaders().put(Headers.ACCEPT, "text/event-stream");
             request.getRequestHeaders().put(Headers.HOST, url);
 //            request.getRequestHeaders().put(Headers.ORIGIN, "http://localhost");
+            for (HeaderValues header : headers) {
+                request.getRequestHeaders().putAll(header.getHeaderName(), header);
+            }
+
+
             if (this.lastEventId != null && !this.lastEventId.isEmpty()) {
                 request.getRequestHeaders().put(HttpString.tryFromString("Last-Event-ID"), this.lastEventId);
             }
@@ -115,7 +121,7 @@ public class SSEConnection extends StreamConnection {
 
     @Override
     protected void closeChannel() {
-        if (connection != null) {
+        if (isOpen()) {
             StreamConnection.closeChannel(connection);
             connection = null;
             callback.onClose(lastEventId);

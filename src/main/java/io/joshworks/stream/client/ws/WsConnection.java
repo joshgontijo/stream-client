@@ -40,8 +40,6 @@ public class WsConnection extends StreamConnection {
             return;
         }
         shuttingDown = false;
-
-        logger.info("Connecting to {}", url);
         webSocketChannel = new WebSocketClient.ConnectionBuilder(
                 worker,
                 new DefaultByteBufferPool(false, 2048), //TODO configurable ?
@@ -54,7 +52,7 @@ public class WsConnection extends StreamConnection {
 
         webSocketChannel.getReceiveSetter().set(proxyClientEndpoint);
         webSocketChannel.getCloseSetter().set((ChannelListener<AbstractFramedChannel>) channel -> {
-            if(!clientClose) {
+            if (!clientClose) {
                 closeChannel();
                 proxyClientEndpoint.onCloseMessage(null, webSocketChannel);
                 reconnect();
@@ -65,7 +63,6 @@ public class WsConnection extends StreamConnection {
         webSocketChannel.resumeReceives();
 
         monitor.add(uuid, this::closeChannel);
-        logger.info("Connected to {}", url);
         clientClose = false;
 
     }
@@ -95,7 +92,7 @@ public class WsConnection extends StreamConnection {
 
     private void sendClose(CloseMessage closeMessage) {
         try {
-            if (webSocketChannel != null && webSocketChannel.isOpen()) {
+            if (isOpen()) {
                 webSocketChannel.setCloseCode(closeMessage.getCode());
                 webSocketChannel.setCloseReason(closeMessage.getReason());
                 webSocketChannel.sendClose();
@@ -110,6 +107,9 @@ public class WsConnection extends StreamConnection {
     }
 
     public void sendText(String message) {
+        if (!isOpen()) {
+            throw new IllegalStateException("Channel is not open");
+        }
         WebSockets.sendText(message, webSocketChannel, null);
     }
 
