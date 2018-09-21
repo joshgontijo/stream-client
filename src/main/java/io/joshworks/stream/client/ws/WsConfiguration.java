@@ -39,8 +39,7 @@ public class WsConfiguration extends ClientConfiguration {
         super(url, worker, scheduler, monitor);
     }
 
-    public WsConfiguration(String url, XnioWorker worker, ScheduledExecutorService scheduler,
-                           ConnectionMonitor monitor, WebSocketClientEndpoint endpoint) {
+    public WsConfiguration(String url, XnioWorker worker, ScheduledExecutorService scheduler, ConnectionMonitor monitor, WebSocketClientEndpoint endpoint) {
         super(url, worker, scheduler, monitor);
         this.endpoint = endpoint;
     }
@@ -106,10 +105,25 @@ public class WsConfiguration extends ClientConfiguration {
         return this;
     }
 
-    public WsConnection connect() {
+    public WsConnection connectAsync() {
         endpoint = endpoint == null ? createEndpoint() : endpoint;
         WsConnection wsConnection = new WsConnection(this, endpoint);
         wsConnection.connect();
+        return wsConnection;
+    }
+
+    public WsConnection connect() {
+        endpoint = endpoint == null ? createEndpoint() : endpoint;
+        WsConnection wsConnection = new WsConnection(this, endpoint);
+        try {
+            //try connect synchronously first
+            wsConnection.tryConnect();
+        } catch (Exception e) {
+            if (maxRetries == 0) {
+                throw new RuntimeException("Could not connect to " + url, e);
+            }
+            wsConnection.connect();
+        }
 
         return wsConnection;
     }

@@ -98,6 +98,23 @@ public class SseConfiguration extends ClientConfiguration {
         clientCallback = clientCallback == null ? createClientCallback() : clientCallback;
 
         SSEConnection connection = new SSEConnection(this, lastEventId, clientCallback);
+        try {
+            //try connect synchronously first
+            connection.tryConnect();
+        } catch (Exception e) {
+            if (maxRetries == 0) {
+                throw new RuntimeException("Could not connect to " + url, e);
+            }
+            connection.connect();
+        }
+
+        return connection;
+    }
+
+    public SSEConnection connectAsync() {
+        clientCallback = clientCallback == null ? createClientCallback() : clientCallback;
+
+        SSEConnection connection = new SSEConnection(this, lastEventId, clientCallback);
         connection.connect();
         return connection;
     }
