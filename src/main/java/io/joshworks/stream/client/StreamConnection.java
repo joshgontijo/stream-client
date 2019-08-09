@@ -55,17 +55,18 @@ public abstract class StreamConnection {
     }
 
     protected static void closeChannel(Channel channel) {
-        if (channel != null && channel.isOpen()) {
-            try {
-                channel.close();
-            } catch (IOException e) {
-                logger.error("Error while closing channel", e);
-            }
+        if (channel == null) {
+            return;
+        }
+        try {
+            channel.close();
+        } catch (IOException e) {
+            logger.error("Error while closing channel", e);
         }
     }
 
     protected void reconnect() {
-       reconnect(retryInterval);
+        reconnect(retryInterval);
     }
 
     protected void reconnect(long delay) {

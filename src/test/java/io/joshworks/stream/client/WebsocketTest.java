@@ -34,7 +34,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static io.joshworks.snappy.SnappyServer.*;
+import static io.joshworks.snappy.SnappyServer.start;
+import static io.joshworks.snappy.SnappyServer.stop;
+import static io.joshworks.snappy.SnappyServer.websocket;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -53,8 +55,11 @@ public class WebsocketTest {
 
     @Before
     public void setup() {
-        websocket("/ws", (exchange, channel) -> {
-            WebSockets.sendText(message, channel, null);
+        websocket("/ws", new WebsocketEndpoint() {
+            @Override
+            public void onConnect(WebSocketHttpExchange webSocketHttpExchange, WebSocketChannel webSocketChannel) {
+                WebSockets.sendText(message, webSocketChannel, null);
+            }
         });
 
         websocket("/ws-close", new WebsocketEndpoint() {
@@ -115,12 +120,12 @@ public class WebsocketTest {
             }
         });
 
-        if(!onConnect.await(10, TimeUnit.SECONDS)) {
+        if(!onConnect.await(5, TimeUnit.SECONDS)) {
             fail("onConnect not called");
         }
         assertTrue(connection.isOpen());
 
-        if(!onMessage.await(10, TimeUnit.SECONDS)) {
+        if(!onMessage.await(5, TimeUnit.SECONDS)) {
             fail("No message was received");
         }
         assertNotNull(result.get());
