@@ -18,11 +18,10 @@
 package io.joshworks.stream.client;
 
 import io.joshworks.snappy.sse.SseBroadcaster;
+import io.joshworks.snappy.sse.SseContext;
 import io.joshworks.stream.client.sse.EventData;
 import io.joshworks.stream.client.sse.SSEConnection;
 import io.joshworks.stream.client.sse.SseClientCallback;
-import io.undertow.server.handlers.sse.ServerSentEventConnection;
-import io.undertow.util.HeaderValues;
 import io.undertow.util.Headers;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -33,7 +32,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static io.joshworks.snappy.SnappyServer.*;
+import static io.joshworks.snappy.SnappyServer.sse;
+import static io.joshworks.snappy.SnappyServer.start;
+import static io.joshworks.snappy.SnappyServer.stop;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -45,39 +46,41 @@ import static org.junit.Assert.fail;
  */
 public class ServerSentEventTest {
 
-    private AtomicReference<ServerSentEventConnection> serverConnectionRef = new AtomicReference<>();
+    private AtomicReference<SseContext> serverConnectionRef = new AtomicReference<>();
+
+    private SseBroadcaster emptyBroadcaster;
+    private SseBroadcaster idBroadcaster;
+    private SseBroadcaster serverCloseBroadcaster;
+    private SseBroadcaster echoAuthorizationHeaderCloseBroadcaster;
 
     @Before
     public void init() {
 
-        sse("/empty");
+        emptyBroadcaster = sse("/empty");
 
-        sse("/simple", (connection, lastEventId) -> {
-            connection.addCloseTask(channel -> System.out.println("Disconnected"));
+        sse("/simple", sse -> {
+            sse.onClose(() -> System.out.println("Disconnected"));
 
-            connection.send("1");
-            connection.send("2");
-            connection.send("3");
+            sse.send("1");
+            sse.send("2");
+            sse.send("3");
         });
 
 
-        sse("/id", (connection, lastEventId) -> {
+        idBroadcaster = sse("/id", sse -> {
 
-            int eventId = lastEventId == null ? 0 : Integer.parseInt(lastEventId);
-            connection.addCloseTask(channel -> System.out.println("Disconnected"));
+            int eventId = sse.lastEventId() == null ? 0 : Integer.parseInt(sse.lastEventId());
+            sse.onClose(() -> System.out.println("Disconnected"));
 
-            connection.send("a", "event-type-A", "" + ++eventId, null);
-            connection.send("b", "event-type-A", "" + ++eventId, null);
-            connection.send("c", "event-type-A", "" + ++eventId, null);
+            sse.send(new io.joshworks.snappy.sse.EventData("a", "event-type-A", "" + ++eventId, null));
+            sse.send(new io.joshworks.snappy.sse.EventData("b", "event-type-A", "" + ++eventId, null));
+            sse.send(new io.joshworks.snappy.sse.EventData("c", "event-type-A", "" + ++eventId, null));
         });
 
 
-        sse("/serverClose", (connection, lastEventId) -> serverConnectionRef.set(connection));
+        sse("/serverClose", sse -> serverConnectionRef.set(sse));
 
-        sse("/echoAuthorizationHeader", (connection, lastEventId) -> {
-            HeaderValues authHeader = connection.getRequestHeaders().get(Headers.AUTHORIZATION);
-            connection.send(authHeader.isEmpty() ? "NO HEADER FOUND" : authHeader.getFirst());
-        });
+        sse("/echoAuthorizationHeader", sse -> sse.send(sse.header("Authorization")));
 
         start();
     }
@@ -308,8 +311,8 @@ public class ServerSentEventTest {
             fail("Could not tryConnect to the server");
         }
 
-        SseBroadcaster.broadcast("message 1");
-        SseBroadcaster.broadcast("message 2");
+        emptyBroadcaster.broadcast("message 1");
+        emptyBroadcaster.broadcast("message 2");
 
         if (!messageLatch.await(10, TimeUnit.SECONDS)) {
             fail("Failed on waiting messages from the server");
