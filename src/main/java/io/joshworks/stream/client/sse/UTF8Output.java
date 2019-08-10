@@ -89,9 +89,6 @@ public final class UTF8Output {
         }
     }
 
-    /**
-     * Extract a String holding the utf8 text
-     */
     public String extract() {
         String text = stringBuilder.toString();
         stringBuilder.setLength(0);
