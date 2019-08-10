@@ -18,7 +18,6 @@
 package io.joshworks.stream.client;
 
 import io.joshworks.snappy.sse.SseBroadcaster;
-import io.joshworks.snappy.sse.SseContext;
 import io.joshworks.stream.client.sse.EventData;
 import io.joshworks.stream.client.sse.SSEConnection;
 import io.joshworks.stream.client.sse.SseClientCallback;
@@ -46,17 +45,12 @@ import static org.junit.Assert.fail;
  */
 public class ServerSentEventTest {
 
-    private AtomicReference<SseContext> serverConnectionRef = new AtomicReference<>();
-
-    private SseBroadcaster emptyBroadcaster;
-    private SseBroadcaster idBroadcaster;
-    private SseBroadcaster serverCloseBroadcaster;
-    private SseBroadcaster echoAuthorizationHeaderCloseBroadcaster;
+    private SseBroadcaster broadcaster;
 
     @Before
     public void init() {
 
-        emptyBroadcaster = sse("/empty");
+        broadcaster = sse("/empty");
 
         sse("/simple", sse -> {
             sse.onClose(() -> System.out.println("Disconnected"));
@@ -67,18 +61,21 @@ public class ServerSentEventTest {
         });
 
 
-        idBroadcaster = sse("/id", sse -> {
+        sse("/id", sse -> {
 
             int eventId = sse.lastEventId() == null ? 0 : Integer.parseInt(sse.lastEventId());
             sse.onClose(() -> System.out.println("Disconnected"));
 
-            sse.send(new io.joshworks.snappy.sse.EventData("a", "event-type-A", "" + ++eventId, null));
-            sse.send(new io.joshworks.snappy.sse.EventData("b", "event-type-A", "" + ++eventId, null));
-            sse.send(new io.joshworks.snappy.sse.EventData("c", "event-type-A", "" + ++eventId, null));
+            sse.send(new io.joshworks.snappy.sse.EventData("a", String.valueOf(++eventId), "event-type-A", null));
+            sse.send(new io.joshworks.snappy.sse.EventData("b", String.valueOf(++eventId), "event-type-A", null));
+            sse.send(new io.joshworks.snappy.sse.EventData("c", String.valueOf(++eventId), "event-type-A", null));
         });
 
 
-        sse("/serverClose", sse -> serverConnectionRef.set(sse));
+        sse("/serverClose", sse -> {
+            Thread.sleep(1000);
+            sse.close();
+        });
 
         sse("/echoAuthorizationHeader", sse -> sse.send(sse.header("Authorization")));
 
@@ -95,7 +92,6 @@ public class ServerSentEventTest {
         StreamClient.shutdown();
         stop();
     }
-
 
     @Test
     public void messageReceived() throws Exception {
@@ -166,9 +162,6 @@ public class ServerSentEventTest {
             fail("Client did not connect");
         }
 
-        //close server connection
-        serverConnectionRef.get().close();
-
         if (!onClose.await(10, TimeUnit.SECONDS)) {
             fail("Client could not detect connection closed by the server");
         }
@@ -203,10 +196,6 @@ public class ServerSentEventTest {
         if (!connected.await(10, TimeUnit.SECONDS)) {
             fail("Client did not connect");
         }
-
-        //close server connection
-        serverConnectionRef.get().close();
-
 
         if (!closed.await(10, TimeUnit.SECONDS)) {
             fail("Client could not detect connection closed by the server");
@@ -311,8 +300,14 @@ public class ServerSentEventTest {
             fail("Could not tryConnect to the server");
         }
 
-        emptyBroadcaster.broadcast("message 1");
-        emptyBroadcaster.broadcast("message 2");
+        //client 'onOpen' can triggers before than server adds the connection to broadcaster
+        int retries = 0;
+        while (broadcaster.connected() == 0 && retries++ < 10) {
+            Thread.sleep(500);
+        }
+
+        broadcaster.broadcast("message 1");
+        broadcaster.broadcast("message 2");
 
         if (!messageLatch.await(10, TimeUnit.SECONDS)) {
             fail("Failed on waiting messages from the server");
@@ -455,6 +450,17 @@ public class ServerSentEventTest {
         }
 
         assertEquals(headerValue, received.get());
+    }
+
+    @Test
+    public void compression() throws Exception {
+        SSEConnection connection = StreamClient.sse("http://localhost:9000/simple")
+                .header(Headers.ACCEPT_ENCODING, "gzip")
+                .onEvent(System.out::println)
+                .connect();
+
+        Thread.sleep(12000);
+
     }
 
 }
